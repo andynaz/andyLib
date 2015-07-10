@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	andyProject build file
+	version: 0.7
+	date:    2015-05-06
+-->
+<project name="andyLib" default="test" basedir=".">
+
+	<description>Builds, tests, and deploys the project.</description>
+
+	<property file="build.properties" description="Base properties" />
+	<!-- inner properties, derived from the basic ones -->
+	<property name="jar.test"     value="${project.code}.jar"                            description="Name of the JAR file (build and test)" />
+	<property name="jar.dist"     value="${project.code}-${project.version}.jar"         description="Name of the JAR file to be distributed" />
+	<property name="dist.src"     value="${project.code}-${project.version}-src.tar.bz2" description="Name of the source package to be distributed" />
+	<property name="dist.bin"     value="${project.code}-${project.version}.tar.bz2"     description="Name of the binary package to be distributed" />
+	<property name="version.file" value="${src}/it/andynaz/resources/version.properties" description="File with the version data" />	
+	
+	<path id="classpath.compile" description="libraries for compiling">
+		<fileset dir="${lib}" includes="*.jar" erroronmissingdir="false"/>
+		<fileset dir="${lib-compile}" includes="*.jar" erroronmissingdir="false"/>
+	</path>
+	
+	<path id="classpath.dist" description="libraries to be ditributed">
+		<fileset dir="${lib}" includes="*.jar"/>
+	</path>
+
+
+	<target name="clear" description="Clean the project">
+		<echo message="compiled files..." />
+			<delete dir="${build}" />
+		<echo message="test..." />
+			<delete dir="${test}/lib/" />
+			<delete file="${test}/${jar.test}" />
+		<echo message="deploy..." />
+			<delete dir="${dist}/lib/" />
+			<delete dir="${dist}" />
+		<echo message="docs..." />
+			<delete dir="${javadoc}" />
+		<echo message="dist packages..." />
+			<delete file="${dist.src}" />
+			<delete file="${dist.bin}" />
+	</target>
+
+
+	<target name="compile" description="Compiles all the sources">
+		<mkdir dir="${build}/classes"/>
+		<javac srcdir="${src}" destdir="${build}/classes"
+		       target="1.6" source="1.6" debug="true">
+			<classpath refid="classpath.compile" />
+			<exclude name="**/package-info.java" />
+	<!--		<compilerarg value="-Xlint:unchecked" /> -->
+		</javac>
+		<!-- project data -->
+		<copy todir="${build}/classes">
+			<fileset dir="${src}">
+				<include name="it/andynaz/resources/*" />
+			</fileset>
+		</copy>
+		<!-- ADDITIONAL FILES (like images or other resources) -->
+	</target>
+
+
+	<target name="jar" depends="compile" description="Creates the JAR file of the project, with the correct 'MANIFEST.MF' file">
+		<!-- set the date property -->
+		<tstamp>
+			<format property="jarDate" pattern="dd-MM-yyyy HH:mm:ss" />
+		</tstamp>
+		<mkdir dir="${build}"/>
+		<delete file="${build}/${jar.test}" />
+		<jar jarfile="${build}/${jar.test}">
+			<manifest>
+				<attribute name="Version" value="${project.version}" />
+				<attribute name="Date" value="${jarDate}"/>
+			</manifest>
+			<fileset dir="${build}/classes" includes="**" />
+		</jar>
+	</target>
+
+
+	<!-- TEST -->
+	<target name="test" depends="update-version-test,jar" description="Compiles and deploys the project for testing">
+		<mkdir dir="${test}/lib" />
+		<copy todir="${test}/lib">
+			<path refid="classpath.dist" />
+		</copy>
+		<copy file="${build}/${jar.test}" todir="${test}" preservelastmodified="true"/>
+	</target>
+	
+	
+	<!-- DISTRIBUTION -->
+	<target name="deploy" depends="update-version,jar" description="Compiles and deploys the project">
+		<mkdir dir="${dist}/generated" />
+		<copy file="${build}/${jar.test}" tofile="${dist}/generated/${jar.dist}" preservelastmodified="true"/>
+		<copy file="licence.txt" todir="${dist}/generated" preservelastmodified="true"/>
+	</target>
+
+
+	<target name="dist-bin" depends="deploy,javadoc" description="Creates an archive with the project">
+		<tar destfile="${dist}/${dist.bin}" compression="bzip2" basedir="${dist}/generated">
+			<tarfileset dir=".">
+				<include name="${javadoc}/**" />
+			</tarfileset>
+		</tar>
+	</target>
+
+
+	<target name="dist-src" description="Creates an archive with the sources of the project">
+		<tar destfile="${dist}/${dist.src}" compression="bzip2">
+			<tarfileset dir=".">
+				<include name="${lib}/*" />
+				<include name="${lib-compile}/*" />
+				<include name="${src}/**" />
+				<include name="build.properties" />
+				<include name="build.xml" />
+				<include name="${doc}/javase/*" />
+				<include name="licence.txt" />
+			</tarfileset>
+		</tar>
+	</target>
+	
+	
+	<target name="dist" depends="dist-bin,dist-src" description="Deploy all the file for the project" />
+
+
+	<!-- DOCUMENTATION -->
+	<target name="javadoc" description="Create the documentation">
+		<javadoc classpathref="classpath.compile"
+		         sourcepath="${src}"
+		         packagenames="*"
+		         destdir="${javadoc}"
+		         author="true"
+		         version="true"
+		         private="true"
+		         linkoffline="http://docs.oracle.com/javase/6/docs/api/ javase"
+		         windowtitle="${project.name} API">
+			<doctitle>${project.name}</doctitle>
+			<header>${project.name} v${project.version}</header>
+			<bottom><![CDATA[<small>&copy; 2013-2015 andynaz - <a target="_blank" href="http://andynaz.altervista.org">http://andynaz.altervista.org</a></small>]]></bottom>
+		</javadoc>
+	</target>
+
+	<target name="update-version" description="Update the version file">
+		<tstamp>
+			<format property="timestampDate" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT" />
+		</tstamp>
+		<replaceregexp file="${version.file}" match="date=(.+)" replace="date=${timestampDate}" />
+		<replaceregexp file="${version.file}" match="version=(.+)" replace="version=${project.version}" />
+	</target>
+	
+	<target name="update-version-test" description="Update the version file for testing">
+		<tstamp>
+			<format property="timestampDate" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT" />
+		</tstamp>
+		<replaceregexp file="${version.file}" match="date=(.+)" replace="date=${timestampDate}" />
+		<replaceregexp file="${version.file}" match="version=(.+)" replace="version=${project.version}_test" />
+	</target>
+
+</project>
